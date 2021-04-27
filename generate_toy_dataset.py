@@ -1,5 +1,4 @@
 import numpy as np
-import math
 
 def generate_random_sequence():
     arr = np.random.uniform(0.0, 1.0, 50)
@@ -13,8 +12,13 @@ def generate_random_sequence():
     return arr
 
 
+def create_toy_data(n_seqs=10000):
+    dataset = []
+    for i in range(n_seqs):
+        dataset.append(generate_random_sequence())
+    return np.expand_dims(dataset, 2)
+
+
 if __name__ == '__main__':
-    for i in range(100):
-        a = generate_random_sequence()
-        print([l for l in a if l < 0 or l > 1])
-        print(a.mean())
+    dataset = create_toy_data()
+    print('done')
