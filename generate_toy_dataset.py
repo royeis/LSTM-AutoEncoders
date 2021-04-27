@@ -14,11 +14,15 @@ def generate_random_sequence():
 
 def create_toy_data(n_seqs=10000):
     dataset = []
+    train_size = int(0.6*n_seqs)
+    validate_size = int(0.8 * n_seqs)
     for i in range(n_seqs):
         dataset.append(generate_random_sequence())
-    return np.expand_dims(dataset, 2)
+    # return np.expand_dims(dataset, 2)
+    dataset = np.expand_dims(dataset, axis=2)
+    return dataset[:train_size], dataset[train_size:validate_size], dataset[validate_size:]
 
 
 if __name__ == '__main__':
-    dataset = create_toy_data()
+    x_train, x_validate, x_test = create_toy_data()
     print('done')
