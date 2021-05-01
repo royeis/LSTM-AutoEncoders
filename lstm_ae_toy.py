@@ -1,5 +1,3 @@
-import random
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -44,9 +42,9 @@ if __name__ == '__main__':
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     print(f'device used: {device}')
 
-    do_train = 0
-    do_val = 0
-    do_test = 1
+    do_train = 1
+    do_val = 1
+    do_test = 0
 
     x_train, x_validate, x_test = create_toy_data()
     # plot_signals(x_train[:3])
