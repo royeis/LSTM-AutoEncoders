@@ -35,11 +35,11 @@ class LSTM_AutoEncoder(nn.Module):
         if self.n_categories:
             self.linear_classifier = nn.Linear(dec_hidden_size, self.n_categories)
 
-        # we will flow, maximum it will throw.
         self.act = activation()
 
     def forward(self, batch):
         _, (z, _) = self.encoder_lstm(batch)
+        print(z.shape)
         z = z.reshape(batch.shape[0], 1, -1).expand(-1, batch.shape[1], -1)
         h_s, (h_t, _) = self.decoder_lstm(z)
         x_rec = self.act(self.linear(h_s))
