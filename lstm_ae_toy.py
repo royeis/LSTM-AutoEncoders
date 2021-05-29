@@ -51,7 +51,7 @@ if __name__ == '__main__':
     set_all_seed(2021)
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     print(device)
-    do_train = 0
+    do_train = 1
     do_test = 0
     do_val = 1
 

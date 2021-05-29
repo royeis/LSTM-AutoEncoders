@@ -10,9 +10,12 @@ class LSTM_AutoEncoder(nn.Module):
             dec_hidden_size,
             enc_n_layers,
             dec_n_layers,
-            activation
+            activation,
+            n_categories=None
     ):
         super(LSTM_AutoEncoder, self).__init__()
+
+        self.n_categories = n_categories
 
         self.encoder_lstm = nn.LSTM(
             input_size=input_size,
@@ -29,6 +32,8 @@ class LSTM_AutoEncoder(nn.Module):
         )
 
         self.linear = nn.Linear(dec_hidden_size, input_size)
+        if self.n_categories:
+            self.linear_classifier = nn.Linear(dec_hidden_size, self.n_categories)
 
         # we will flow, maximum it will throw.
         self.act = activation()
@@ -36,8 +41,11 @@ class LSTM_AutoEncoder(nn.Module):
     def forward(self, batch):
         _, (z, _) = self.encoder_lstm(batch)
         z = z.reshape(batch.shape[0], 1, -1).expand(-1, batch.shape[1], -1)
-        h_s, _ = self.decoder_lstm(z)
+        h_s, (h_t, _) = self.decoder_lstm(z)
         x_rec = self.act(self.linear(h_s))
-        return x_rec
+        if self.n_categories:
+            c = self.linear_classifier(h_t.squeeze())
+            return x_rec, c
+        return x_rec, None
 
 
