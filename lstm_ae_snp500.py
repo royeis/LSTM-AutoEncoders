@@ -30,6 +30,10 @@ def prepare_stock_data(stock_symbol):
     return data, len(data)
 
 
+def normalize_stock_data(stock_data):
+    stock_data = (stock_data - np.mean(stock_data)) / np.std(stock_data)
+    return stock_data
+
 
 if __name__ == '__main__':
 
@@ -77,6 +81,7 @@ if __name__ == '__main__':
     train_seq_lens = []
     for sym in train_symbols:
         stock_data, stock_data_len = prepare_stock_data(sym)
+        stock_data = normalize_stock_data(stock_data)
         stock_tensor = torch.Tensor(stock_data)
         train_seq_lens.append(stock_data_len)
         train_tensors.append(stock_tensor)
@@ -88,6 +93,7 @@ if __name__ == '__main__':
     test_tensors = []
     for sym in test_symbols:
         stock_data, stock_data_len = prepare_stock_data(sym)
+        stock_data = normalize_stock_data(stock_data)
         test_seq_lens.append(stock_data_len)
         stock_tensor = torch.Tensor(stock_data)
         test_tensors.append(stock_tensor)
@@ -118,10 +124,6 @@ if __name__ == '__main__':
             for batch in train_loader:
                 x = batch[0].to(device)
                 lens = batch[1].squeeze()
-
-                print(x)
-
-                x = pack_padded_sequence(x, lens, batch_first=True, enforce_sorted=False)
 
                 x_rec, _ = model(x)
                 loss = criterion(x, x_rec)
