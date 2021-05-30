@@ -31,7 +31,9 @@ def prepare_stock_data(stock_symbol):
 
 
 def normalize_stock_data(stock_data):
-    stock_data = (stock_data - np.mean(stock_data)) / np.std(stock_data)
+    a = np.min(stock_data)
+    b = np.max(stock_data)
+    stock_data = (stock_data - a) / (b - a)
     return stock_data
 
 
@@ -54,9 +56,9 @@ if __name__ == '__main__':
     set_all_seed(args.seed)
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     print(device)
-    do_train = 0
+    do_train = 1
     do_test = 1
-    do_val = 0
+    prediction_mode = 0
     do_create_data = 0
 
     if do_create_data:
@@ -122,14 +124,11 @@ if __name__ == '__main__':
                              activation=nn.Sigmoid,
                              ).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    criterion = nn.MSELoss()
-    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
-    # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.01, steps_per_epoch=len(train_loader),
-    #                                                 epochs=500)
+    criterion = nn.MSELoss(reduction='sum')
 
     if do_train:
         model.load_state_dict(torch.load('sp_model_hs128.pth'))
-        t = trange(2000)
+        t = trange(500)
         for epoch in t:
             model.train()
             losses = []
@@ -148,11 +147,14 @@ if __name__ == '__main__':
                 optimizer.step()
                 optimizer.zero_grad()
 
-                x.detach()
-                x_rec.detach()
+                x = x.detach()
+                x_rec = x_rec.detach()
+
 
                 t.set_description('epoch {} train_loss {:.2f} '
                                   .format(epoch, np.mean(losses)))
+            if epoch % 25 == 0:
+                plot_stocks_with_rec(x[:3].cpu(), x_rec[:3].cpu(), lens[:3])
                 # scheduler.step()
 
             # model.eval()
