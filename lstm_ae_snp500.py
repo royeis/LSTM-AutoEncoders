@@ -113,20 +113,22 @@ if __name__ == '__main__':
                              dec_n_layers=1,
                              activation=nn.Sigmoid,
                              ).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
-    criterion = nn.MSELoss(reduction='sum')
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    criterion = nn.MSELoss()
 
     if do_train:
-        t = trange(250)
+        t = trange(150)
         for epoch in t:
             model.train()
             losses = []
             for batch in train_loader:
                 x = batch[0].to(device)
-                lens = batch[1].squeeze()
+                lens = batch[1].squeeze().long()
 
-                x_rec, _ = model(x)
+                x_rec, _ = model(x, lens)
                 loss = criterion(x, x_rec)
+                print('\nloss')
+                print(loss.item())
 
                 losses.append(loss.item())
                 loss.backward()
@@ -143,14 +145,14 @@ if __name__ == '__main__':
         torch.save(model.state_dict(), 'sp_model_hs128.pth')
 
     if do_test:
-        torch.load('sp_model_hs128.pth')
+        model.load_state_dict(torch.load('sp_model_hs128.pth'))
         model.eval()
         test_losses = []
         with torch.no_grad():
             for batch in test_loader:
                 x = batch[0].to(device)
-                lens = batch[1].squeeze()
-                x = pack_padded_sequence(x, lens, batch_first=True, enforce_sorted=False)
+                lens = batch[1].squeeze().long()
+
                 x_rec, _ = model(x)
                 loss = criterion(x, x_rec)
                 test_losses.append(loss.item())
