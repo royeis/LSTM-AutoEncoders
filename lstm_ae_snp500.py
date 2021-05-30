@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import TensorDataset
 from tqdm import trange
@@ -114,7 +114,7 @@ if __name__ == '__main__':
                              activation=nn.Sigmoid,
                              ).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    criterion = nn.MSELoss()
+    criterion = nn.MSELoss(reduction='sum')
 
     if do_train:
         t = trange(150)
@@ -126,9 +126,8 @@ if __name__ == '__main__':
                 lens = batch[1].squeeze().long()
 
                 x_rec, _ = model(x, lens)
-                loss = criterion(x, x_rec)
-                print('\nloss')
-                print(loss.item())
+
+                loss = criterion(x_rec.squeeze(), x.squeeze())
 
                 losses.append(loss.item())
                 loss.backward()
