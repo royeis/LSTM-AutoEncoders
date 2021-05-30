@@ -42,7 +42,7 @@ if __name__ == '__main__':
     set_all_seed(args.seed)
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     print(device)
-    do_train = 1
+    do_train = 0
     do_test = 1
     do_val = 0
     classify = 1
@@ -78,12 +78,15 @@ if __name__ == '__main__':
                              activation=nn.Sigmoid,
                              n_categories=10
                              ).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
-    criterion = nn.MSELoss(reduction='sum')
-    criterion_classify = nn.CrossEntropyLoss(reduction='mean')
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    criterion = nn.MSELoss()
+    criterion_classify = nn.CrossEntropyLoss()
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+
+    # α = 1e4
 
     if do_train:
-        t = trange(250)
+        t = trange(50)
         x, x_rec = None, None
         for epoch in t:
             model.train()
@@ -91,7 +94,6 @@ if __name__ == '__main__':
             for batch in train_loader:
                 x = batch[0].squeeze().to(device)
                 y = batch[1].to(device)
-                # x = x.view(x.shape[0], -1, 28)
 
                 x_rec, c = model(x)
 
@@ -101,7 +103,7 @@ if __name__ == '__main__':
                     loss += criterion_classify(c, y)
                 losses.append(loss.item())
                 loss.backward()
-                nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
                 optimizer.zero_grad()
 
@@ -112,28 +114,67 @@ if __name__ == '__main__':
                 t.set_description('epoch {} train_loss {:.2f} '
                                   .format(epoch, np.mean(losses)))
 
-        torch.save(model.state_dict(), 'mnist_data_model_weights_one_clip5_hs64.pth')
+            model.eval()
+            with torch.no_grad():
+                test_losses = []
+                test_acc = []
+                for batch in test_loader:
+                    x_t = batch[0].squeeze().to(device)
+                    y_t = batch[1].to(device)
+
+                    x_rec_t, c_t = model(x_t)
+
+                    loss = criterion(x_t, x_rec_t)
+
+                    if classify:
+                        loss += criterion_classify(c_t, y_t)
+                    test_losses.append(loss.item())
+
+                    test_acc.append(torch.sum(torch.argmax(F.softmax(c_t), dim=1) == y_t).item() / float(len(c_t)))
+            if epoch % 10 == 0:
+                for ii in range(4):
+                    fig = plt.figure
+                    plt.imshow(x_t[ii].detach().cpu().numpy(), cmap='gray')
+                    plt.show()
+                    plt.imshow(x_rec_t[ii].detach().cpu().numpy(), cmap='gray')
+                    plt.show()
+            print('test_epoch {} test_loss {:.4f} test_acc {:.4f} '
+                              .format(epoch, np.mean(test_losses), np.mean(test_acc)))
+            print(y_t)
+            print(torch.argmax(F.softmax(c_t), dim=1))
+            scheduler.step(np.mean(test_losses))
+            torch.save(model.state_dict(), 'mnist_data_model_weights_one_clip1_hs128_class.pth')
 
     if do_test:
-        torch.load('mnist_data_model_weights_one_clip5_hs64.pth')
+        model.load_state_dict(torch.load('mnist_data_model_weights_one_clip1_hs128_class.pth'))
         model.eval()
         with torch.no_grad():
-            for batch in train_loader:
-
+            test_losses = []
+            test_acc = []
+            for batch in test_loader:
                 x = batch[0].squeeze().to(device)
-                y = batch[1]
+                y = batch[1].to(device)
+
                 x_rec, c = model(x)
 
-                c_t = np.argmax(F.softmax(c).detach().cpu().numpy(), axis=1)
-                y = y.detach().cpu().numpy()
-                print(c_t)
-                print(y)
-                # x_rec = x_rec.view(x.shape[0], -1, 28)
-                # for ii in range(4):
-                #     fig = plt.figure
-                #     plt.imshow(x[ii].detach().cpu().numpy(), cmap='gray')
-                #     plt.show()
-                #     plt.imshow(x_rec[ii].detach().cpu().numpy(), cmap='gray')
-                #     plt.show()
+                loss = criterion(x, x_rec)
+                print(loss)
+                print(torch.argmax(F.softmax(c), dim=1))
 
-                break
+                if classify:
+                    loss += criterion_classify(c, y)
+                test_losses.append(loss.item())
+
+                test_acc.append(torch.sum(torch.argmax(F.softmax(c), dim=1) == y).item() / float(len(c)))
+
+                for ii in range(x.shape[0]):
+                    fig = plt.figure
+                    plt.imshow(x[ii].detach().cpu().numpy(), cmap='gray')
+                    plt.show()
+                    plt.imshow(x_rec[ii].detach().cpu().numpy(), cmap='gray')
+                    plt.show()
+
+            print('test_loss {:.4f} test_acc {:.4f} '
+                  .format(np.mean(test_losses), np.mean(test_acc)))
+            print(y)
+            print(torch.argmax(F.softmax(c), dim=1))
