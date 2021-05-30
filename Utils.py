@@ -4,8 +4,10 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def prepare_tensor_dataset(dataset):
     return TensorDataset(torch.Tensor(dataset))
+
 
 def set_all_seeds(seed):
     random.seed(seed)
@@ -35,6 +37,19 @@ def plot_signals_with_rec(signals, signals_rec):
     for sig, sig_rec, ax in zip(signals, signals_rec, axs):
         ax.plot(range(seq_len), sig, label="Original Signal")
         ax.plot(range(seq_len), sig_rec, label="Reconstructed Signal")
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.legend()
+    fig.show()
+
+
+def plot_stocks_with_rec(stock, stock_rec, seq_len):
+    signals, signals_rec = stock.squeeze(), stock_rec.squeeze()
+    fig, axs = plt.subplots(len(signals))
+    fig.suptitle('Original vs Reconstructed Stock Price')
+    for sig, sig_rec, ax, idx in zip(signals, signals_rec, axs, seq_len):
+        ax.plot(range(torch.max(seq_len)), sig[:idx], label="Original Stock Value")
+        ax.plot(range(torch.max(seq_len)), sig_rec[:idx], label="Reconstructed Stock Value")
         ax.spines['right'].set_visible(False)
         ax.spines['top'].set_visible(False)
         ax.legend()

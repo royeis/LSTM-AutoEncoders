@@ -12,7 +12,7 @@ from tqdm import trange
 
 
 from Model import LSTM_AutoEncoder
-from Utils import plot_signals_with_rec
+from Utils import plot_signals_with_rec, plot_stocks_with_rec
 
 
 def set_all_seed(seed):
@@ -38,7 +38,7 @@ def normalize_stock_data(stock_data):
 if __name__ == '__main__':
 
     # hyperparameters
-    parser = argparse.ArgumentParser(description="MNIST Task")
+    parser = argparse.ArgumentParser(description="S&P500 Task")
     parser.add_argument("--epochs", type=int, default=150)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--optimizer", type=str, default="Adam")
@@ -54,55 +54,63 @@ if __name__ == '__main__':
     set_all_seed(args.seed)
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     print(device)
-    do_train = 1
+    do_train = 0
     do_test = 1
     do_val = 0
+    do_create_data = 0
 
-    train_kwargs = {'batch_size': args.batch_size}
-    test_kwargs = {'batch_size': args.batch_size}
-    if device == torch.device('cuda:0'):
-        cuda_kwargs = {'num_workers': 1,
-                       'pin_memory': True,
-                       'shuffle': True}
-        train_kwargs.update(cuda_kwargs)
-        test_kwargs.update(cuda_kwargs)
+    if do_create_data:
+        train_kwargs = {'batch_size': args.batch_size}
+        test_kwargs = {'batch_size': args.batch_size}
+        if device == torch.device('cuda:0'):
+            cuda_kwargs = {'num_workers': 1,
+                           'pin_memory': True,
+                           'shuffle': True}
+            train_kwargs.update(cuda_kwargs)
+            test_kwargs.update(cuda_kwargs)
 
-    stocks = pd.read_csv('SP 500 Stock Prices 2014-2017.csv')
-    stock_symobls = stocks['symbol'].unique().tolist()
-    test_symbols = set(random.sample(stock_symobls, int(0.2 * len(stock_symobls))))
+        stocks = pd.read_csv('SP 500 Stock Prices 2014-2017.csv').dropna()
+        stock_symobls = stocks['symbol'].unique().tolist()
+        test_symbols = set(random.sample(stock_symobls, int(0.2 * len(stock_symobls))))
 
-    stocks = stocks.set_index('symbol', drop=True)
-    train_df = stocks.drop(test_symbols, axis=0)
-    test_df = stocks.drop(stocks.index.difference(test_symbols), axis=0)
+        stocks = stocks.set_index('symbol', drop=True)
+        train_df = stocks.drop(test_symbols, axis=0)
+        test_df = stocks.drop(stocks.index.difference(test_symbols), axis=0)
 
-    train_symbols = train_df.index.unique().tolist()
+        train_symbols = train_df.index.unique().tolist()
 
-    train_tensors = []
-    train_seq_lens = []
-    for sym in train_symbols:
-        stock_data, stock_data_len = prepare_stock_data(sym)
-        stock_data = normalize_stock_data(stock_data)
-        stock_tensor = torch.Tensor(stock_data)
-        train_seq_lens.append(stock_data_len)
-        train_tensors.append(stock_tensor)
-    X = pad_sequence(train_tensors).T.unsqueeze(-1)
-    y = torch.Tensor(train_seq_lens)
-    train_dataset = TensorDataset(X, y)
+        train_tensors = []
+        train_seq_lens = []
+        for sym in train_symbols:
+            stock_data, stock_data_len = prepare_stock_data(sym)
+            stock_data = normalize_stock_data(stock_data)
+            stock_tensor = torch.Tensor(stock_data)
+            train_seq_lens.append(stock_data_len)
+            train_tensors.append(stock_tensor)
+        X = pad_sequence(train_tensors).T.unsqueeze(-1)
+        y = torch.Tensor(train_seq_lens)
+        train_dataset = TensorDataset(X, y)
 
-    test_seq_lens = []
-    test_tensors = []
-    for sym in test_symbols:
-        stock_data, stock_data_len = prepare_stock_data(sym)
-        stock_data = normalize_stock_data(stock_data)
-        test_seq_lens.append(stock_data_len)
-        stock_tensor = torch.Tensor(stock_data)
-        test_tensors.append(stock_tensor)
-    X = pad_sequence(test_tensors).T.unsqueeze(-1)
-    y = torch.Tensor(test_seq_lens)
-    test_dataset = TensorDataset(X, y)
+        test_seq_lens = []
+        test_tensors = []
+        for sym in test_symbols:
+            stock_data, stock_data_len = prepare_stock_data(sym)
+            stock_data = normalize_stock_data(stock_data)
+            test_seq_lens.append(stock_data_len)
+            stock_tensor = torch.Tensor(stock_data)
+            test_tensors.append(stock_tensor)
+        X = pad_sequence(test_tensors).T.unsqueeze(-1)
+        y = torch.Tensor(test_seq_lens)
+        test_dataset = TensorDataset(X, y)
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
-    test_loader = torch.utils.data.DataLoader(test_dataset, **test_kwargs)
+        train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
+        test_loader = torch.utils.data.DataLoader(test_dataset, **test_kwargs)
+
+        torch.save(train_loader, 'train_loader.pkl')
+        torch.save(test_loader, 'test_loader.pkl')
+
+    train_loader = torch.load('train_loader.pkl')
+    test_loader = torch.load('test_loader.pkl')
 
     inp_size = 1
 
@@ -115,9 +123,13 @@ if __name__ == '__main__':
                              ).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.MSELoss()
+    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+    # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.01, steps_per_epoch=len(train_loader),
+    #                                                 epochs=500)
 
     if do_train:
-        t = trange(150)
+        model.load_state_dict(torch.load('sp_model_hs128.pth'))
+        t = trange(2000)
         for epoch in t:
             model.train()
             losses = []
@@ -126,9 +138,9 @@ if __name__ == '__main__':
                 lens = batch[1].squeeze().long()
 
                 x_rec, _ = model(x, lens)
-                loss = criterion(x, x_rec)
-                print('\nloss')
-                print(loss.item())
+                loss = 0.0
+                for i, idx in enumerate(lens):
+                    loss += criterion(x[i][:idx], x_rec[i][:idx])
 
                 losses.append(loss.item())
                 loss.backward()
@@ -141,6 +153,21 @@ if __name__ == '__main__':
 
                 t.set_description('epoch {} train_loss {:.2f} '
                                   .format(epoch, np.mean(losses)))
+                # scheduler.step()
+
+            # model.eval()
+            # test_losses = []
+            # with torch.no_grad():
+            #     for batch in test_loader:
+            #         x = batch[0].to(device)
+            #         lens = batch[1].squeeze().long()
+            #
+            #         x_rec, _ = model(x)
+            #         loss = 0.0
+            #         for i, idx in enumerate(lens):
+            #             loss += criterion(x[i][:idx], x_rec[i][:idx])
+            #         test_losses.append(loss.item())
+            # scheduler.step(np.mean(test_losses))
 
         torch.save(model.state_dict(), 'sp_model_hs128.pth')
 
@@ -156,7 +183,7 @@ if __name__ == '__main__':
                 x_rec, _ = model(x)
                 loss = criterion(x, x_rec)
                 test_losses.append(loss.item())
-        plot_signals_with_rec(x[:3].detach().cpu(), x_rec[:3].detach().cpu())
+        plot_stocks_with_rec(x[:3].detach().cpu(), x_rec[:3].detach().cpu(), lens[:3])
         print('test loss: {:.2f}'.format(np.mean(test_losses)))
 
 

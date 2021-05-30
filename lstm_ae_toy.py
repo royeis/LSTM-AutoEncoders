@@ -4,15 +4,29 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data.dataloader import DataLoader
 from tqdm import trange
+import argparse
 
 from Model import LSTM_AutoEncoder
 from generate_toy_dataset import create_toy_data
 from Utils import prepare_tensor_dataset, set_all_seeds, plot_signals_with_rec
 
+# hyperparameters
+parser = argparse.ArgumentParser(description="MNIST Task")
+parser.add_argument("--epochs", type=int, default=400)
+parser.add_argument("--batch_size", type=int, default=64)
+parser.add_argument("--optimizer", type=str, default="Adam")
+parser.add_argument("--lr", type=float, default=1e-3)
+parser.add_argument("--clip", type=float, default=1)
+parser.add_argument("--num_layers", type=int, default=1)
+parser.add_argument("--hidden_size", type=int, default=256)
+parser.add_argument("--print_every", type=int, default=30)
+parser.add_argument("--seed", type=int, default=2021)
+
+args = parser.parse_args()
 
 
 if __name__ == '__main__':
-    set_all_seeds(2021)
+    set_all_seeds(args.seed)
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     print(f'device used: {device}')
 
@@ -30,10 +44,10 @@ if __name__ == '__main__':
     test_dataloader = DataLoader(test_dataset, batch_size=64, shuffle=True)
 
     model = LSTM_AutoEncoder(input_size=1,
-                             enc_hidden_size=512,
-                             dec_hidden_size=512,
-                             enc_n_layers=1,
-                             dec_n_layers=1,
+                             enc_hidden_size=args.hidden_size,
+                             dec_hidden_size=args.hidden_size,
+                             enc_n_layers=args.num_layers,
+                             dec_n_layers=args.num_layers,
                              activation=nn.Sigmoid
                              ).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
@@ -46,7 +60,7 @@ if __name__ == '__main__':
             losses = []
             for batch in train_dataloader:
                 x = batch[0].to(device)
-                x_rec = model(x)
+                x_rec, _ = model(x)
                 loss = criterion(x, x_rec)
                 losses.append(loss.item())
                 x.detach()
@@ -64,7 +78,7 @@ if __name__ == '__main__':
                 with torch.no_grad():
                     for val_batch in validate_dataloader:
                         x = val_batch[0].to(device)
-                        x_rec = model(x)
+                        x_rec, _ = model(x)
                         loss = criterion(x, x_rec)
                         valid_losses.append(loss.item())
                 if epoch % 10 == 0:
@@ -81,7 +95,7 @@ if __name__ == '__main__':
         with torch.no_grad():
             for batch in test_dataloader:
                 x = batch[0].to(device)
-                x_rec = model(x)
+                x_rec, _ = model(x)
                 loss = criterion(x, x_rec)
                 test_losses.append(loss.item())
         plot_signals_with_rec(x[:3].detach().cpu(), x_rec[:3].detach().cpu())
