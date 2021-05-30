@@ -12,11 +12,11 @@ from Utils import prepare_tensor_dataset, set_all_seeds, plot_signals_with_rec, 
 
 # hyperparameters
 parser = argparse.ArgumentParser(description="Toy Dataset Task")
-parser.add_argument("--epochs", type=int, default=1000)
+parser.add_argument("--epochs", type=int, default=50000)
 parser.add_argument("--batch_size", type=int, default=64)
 parser.add_argument("--optimizer", type=str, default="Adam")
 parser.add_argument("--lr", type=float, default=1e-3)
-parser.add_argument("--clip", type=float, default=5)
+parser.add_argument("--clip", type=float, default=1)
 parser.add_argument("--num_layers", type=int, default=1)
 parser.add_argument("--hidden_size", type=int, default=25)
 parser.add_argument("--seed", type=int, default=2021)
@@ -116,5 +116,5 @@ if __name__ == '__main__':
 
             t.set_description('epoch {} train loss {:.2f} valid loss {:.2f} test loss {:.2f}'
                               .format(epoch, np.mean(epoch_losses), np.mean(valid_losses), np.mean(t_losses)))
+            torch.save(model.state_dict(), 'toy_data_model_weights_{}.pth'.format(suff))
         plot_loss(train_losses, val_losses, test_losses, args.epochs, suff, parser.description)
-        torch.save(model.state_dict(), 'toy_data_model_weights_{}.pth'.format(suff))

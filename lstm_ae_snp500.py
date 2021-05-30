@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     # hyperparameters
     parser = argparse.ArgumentParser(description="S&P500 Task")
-    parser.add_argument("--epochs", type=int, default=150)
+    parser.add_argument("--epochs", type=int, default=10000)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--optimizer", type=str, default="Adam")
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -60,6 +60,9 @@ if __name__ == '__main__':
     do_test = 1
     prediction_mode = 0
     do_create_data = 0
+
+    suff = 'lr={:.5f}_bs={}_hs={}_clip={:.2f}'.format(args.lr, args.batch_size, args.hidden_size,
+                                                      args.clip)
 
     if do_create_data:
         train_kwargs = {'batch_size': args.batch_size}
@@ -127,7 +130,7 @@ if __name__ == '__main__':
     criterion = nn.MSELoss(reduction='sum')
 
     if do_train:
-        model.load_state_dict(torch.load('sp_model_hs128.pth'))
+        train_loss, test_loss = [], []
         t = trange(500)
         for epoch in t:
             model.train()
@@ -150,43 +153,45 @@ if __name__ == '__main__':
                 x = x.detach()
                 x_rec = x_rec.detach()
 
-
-                t.set_description('epoch {} train_loss {:.2f} '
-                                  .format(epoch, np.mean(losses)))
             if epoch % 25 == 0:
                 plot_stocks_with_rec(x[:3].cpu(), x_rec[:3].cpu(), lens[:3])
-                # scheduler.step()
 
-            # model.eval()
-            # test_losses = []
-            # with torch.no_grad():
-            #     for batch in test_loader:
-            #         x = batch[0].to(device)
-            #         lens = batch[1].squeeze().long()
-            #
-            #         x_rec, _ = model(x)
-            #         loss = 0.0
-            #         for i, idx in enumerate(lens):
-            #             loss += criterion(x[i][:idx], x_rec[i][:idx])
-            #         test_losses.append(loss.item())
-            # scheduler.step(np.mean(test_losses))
+            train_loss.append(np.mean(losses))
 
-        torch.save(model.state_dict(), 'sp_model_hs128.pth')
+            if do_test:
+                model.eval()
+                test_losses = []
+                with torch.no_grad():
+                    for batch in test_loader:
+                        x = batch[0].to(device)
+                        lens = batch[1].squeeze().long()
 
-    if do_test:
-        model.load_state_dict(torch.load('sp_model_hs128.pth'))
-        model.eval()
-        test_losses = []
-        with torch.no_grad():
-            for batch in test_loader:
-                x = batch[0].to(device)
-                lens = batch[1].squeeze().long()
+                        x_rec, _ = model(x)
+                        loss = 0.0
+                        for i, idx in enumerate(lens):
+                            loss += criterion(x[i][:idx], x_rec[i][:idx])
+                        test_losses.append(loss.item())
+                # scheduler.step(np.mean(test_losses))
+                test_loss.append(np.mean(test_losses))
+                t.set_description('epoch {} train_loss {:.2f} test_loss {:.2f}'
+                                  .format(epoch, np.mean(losses), np.mean(test_losses)))
 
-                x_rec, _ = model(x)
-                loss = criterion(x, x_rec)
-                test_losses.append(loss.item())
-        plot_stocks_with_rec(x[:3].detach().cpu(), x_rec[:3].detach().cpu(), lens[:3])
-        print('test loss: {:.2f}'.format(np.mean(test_losses)))
+            torch.save(model.state_dict(), 'sp500_data_model_weights_{}.pth'.format(suff))
+
+    # if do_test:
+    #     model.load_state_dict(torch.load('sp_model_hs128.pth'))
+    #     model.eval()
+    #     test_losses = []
+    #     with torch.no_grad():
+    #         for batch in test_loader:
+    #             x = batch[0].to(device)
+    #             lens = batch[1].squeeze().long()
+    #
+    #             x_rec, _ = model(x)
+    #             loss = criterion(x, x_rec)
+    #             test_losses.append(loss.item())
+    #     plot_stocks_with_rec(x[:3].detach().cpu(), x_rec[:3].detach().cpu(), lens[:3])
+    #     print('test loss: {:.2f}'.format(np.mean(test_losses)))
 
 
 
