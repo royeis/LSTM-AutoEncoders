@@ -55,10 +55,10 @@ if __name__ == '__main__':
 
     set_all_seed(args.seed)
     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-    print(device)
+    print(f'device used: {device}')
     do_train = 1
     do_test = 1
-    prediction_mode = 0
+    do_predict = 1
     do_create_data = 0
 
     if do_create_data:
@@ -122,12 +122,13 @@ if __name__ == '__main__':
                              enc_n_layers=1,
                              dec_n_layers=1,
                              activation=nn.Sigmoid,
+                             prediction_mode=do_predict
                              ).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.MSELoss(reduction='sum')
 
     if do_train:
-        model.load_state_dict(torch.load('sp_model_hs128.pth'))
+        model.load_state_dict(torch.load('sp_model_predictor_hs256.pth'))
         t = trange(500)
         for epoch in t:
             model.train()
@@ -136,10 +137,20 @@ if __name__ == '__main__':
                 x = batch[0].to(device)
                 lens = batch[1].squeeze().long()
 
-                x_rec, _ = model(x, lens)
+                x_rec, x_pred = model(x, lens)
+
                 loss = 0.0
                 for i, idx in enumerate(lens):
                     loss += criterion(x[i][:idx], x_rec[i][:idx])
+
+                if do_predict:
+                    for i, idx in enumerate(lens):
+                        # get prediction for each example: (x'_1, ..., x'_T)
+                        pred_seq = x_pred[i][1:idx]
+                        # true sequence without first observation: (x_1, ..., x_T)
+                        true_seq = x[i][1:idx]
+                        loss += criterion(true_seq, pred_seq)
+
 
                 losses.append(loss.item())
                 loss.backward()
@@ -155,7 +166,10 @@ if __name__ == '__main__':
                                   .format(epoch, np.mean(losses)))
             if epoch % 25 == 0:
                 plot_stocks_with_rec(x[:3].cpu(), x_rec[:3].cpu(), lens[:3])
-                # scheduler.step()
+                if do_predict:
+                    x_pred = x_pred.detach()
+                    plot_stocks_with_rec(x[:3].cpu(), x_pred[:3].cpu(), lens[:3])
+
 
             # model.eval()
             # test_losses = []
@@ -171,10 +185,10 @@ if __name__ == '__main__':
             #         test_losses.append(loss.item())
             # scheduler.step(np.mean(test_losses))
 
-        torch.save(model.state_dict(), 'sp_model_hs128.pth')
+        torch.save(model.state_dict(), 'sp_model_predictor_hs256.pth')
 
     if do_test:
-        model.load_state_dict(torch.load('sp_model_hs128.pth'))
+        model.load_state_dict(torch.load('sp_model_predictor_hs256.pth'))
         model.eval()
         test_losses = []
         with torch.no_grad():
