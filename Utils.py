@@ -87,13 +87,14 @@ def plot_err_epoch(train_loss, test_loss, train_acc, test_acc, epochs, suff, dat
     plt.show()
 
 
-def plot_loss(train_loss, val_loss, test_loss, epochs, suff, data=""):
+def plot_loss(train_loss, test_loss, epochs, suff, data="", val_loss=None):
     fig, ax = plt.subplots()
     ax.set_title(data +
                  '\nLoss vs. Epoch' +
                  f'\n{suff}')
     ax.plot(range(epochs), train_loss, label='Train Loss')
-    ax.plot(range(epochs), val_loss, label='Validation Loss')
+    if val_loss is not None:
+        ax.plot(range(epochs), val_loss, label='Validation Loss')
     ax.plot(range(epochs), test_loss, label='Test Loss')
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)

@@ -12,7 +12,7 @@ from tqdm import trange
 
 
 from Model import LSTM_AutoEncoder
-from Utils import plot_signals_with_rec, plot_stocks_with_rec
+from Utils import plot_signals_with_rec, plot_stocks_with_rec, plot_loss
 
 
 def set_all_seed(seed):
@@ -41,14 +41,13 @@ if __name__ == '__main__':
 
     # hyperparameters
     parser = argparse.ArgumentParser(description="S&P500 Task")
-    parser.add_argument("--epochs", type=int, default=150)
+    parser.add_argument("--epochs", type=int, default=10000)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--optimizer", type=str, default="Adam")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--clip", type=float, default=1)
     parser.add_argument("--num_layers", type=int, default=1)
-    parser.add_argument("--hidden_size", type=int, default=64)
-    parser.add_argument("--print_every", type=int, default=30)
+    parser.add_argument("--hidden_size", type=int, default=256)
     parser.add_argument("--seed", type=int, default=2021)
 
     args = parser.parse_args()
@@ -60,6 +59,9 @@ if __name__ == '__main__':
     do_test = 1
     do_predict = 1
     do_create_data = 0
+
+    suff = 'lr={:.5f}_bs={}_hs={}_clip={:.2f}'.format(args.lr, args.batch_size, args.hidden_size,
+                                                      args.clip)
 
     if do_create_data:
         train_kwargs = {'batch_size': args.batch_size}
@@ -117,19 +119,19 @@ if __name__ == '__main__':
     inp_size = 1
 
     model = LSTM_AutoEncoder(input_size=inp_size,
-                             enc_hidden_size=256,
-                             dec_hidden_size=256,
-                             enc_n_layers=1,
-                             dec_n_layers=1,
+                             enc_hidden_size=args.hidden_size,
+                             dec_hidden_size=args.hidden_size,
+                             enc_n_layers=args.num_layers,
+                             dec_n_layers=args.num_layers,
                              activation=nn.Sigmoid,
                              prediction_mode=do_predict
                              ).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.MSELoss(reduction='sum')
 
     if do_train:
-        model.load_state_dict(torch.load('sp_model_predictor_hs256.pth'))
-        t = trange(500)
+        train_loss, test_loss = [], []
+        t = trange(args.epochs)
         for epoch in t:
             model.train()
             losses = []
@@ -170,10 +172,7 @@ if __name__ == '__main__':
                     x_pred = x_pred.detach()
                     plot_stocks_with_rec(x[:3].cpu(), x_pred[:3].cpu(), lens[:3])
 
-        torch.save(model.state_dict(), 'sp_model_predictor_hs256.pth')
-
     if do_test:
-        model.load_state_dict(torch.load('sp_model_predictor_hs256.pth'))
         model.eval()
         test_losses = []
         with torch.no_grad():
@@ -182,10 +181,31 @@ if __name__ == '__main__':
                 lens = batch[1].squeeze().long()
 
                 x_rec, _ = model(x)
-                loss = criterion(x, x_rec)
+                loss = 0.0
+                for i, idx in enumerate(lens):
+                    loss += criterion(x[i][:idx], x_rec[i][:idx])
                 test_losses.append(loss.item())
-        plot_stocks_with_rec(x[:3].detach().cpu(), x_rec[:3].detach().cpu(), lens[:3])
-        print('test loss: {:.2f}'.format(np.mean(test_losses)))
+                # scheduler.step(np.mean(test_losses))
+                test_loss.append(np.mean(test_losses))
+                t.set_description('epoch {} train_loss {:.2f} test_loss {:.2f}'
+                                  .format(epoch, np.mean(losses), np.mean(test_losses)))
+
+            torch.save(model.state_dict(), 'sp500_data_model_weights_{}.pth'.format(suff))
+        plot_loss(train_loss, test_loss, args.epochs, suff, parser.description)
+    # if do_test:
+    #     model.load_state_dict(torch.load('sp_model_hs128.pth'))
+    #     model.eval()
+    #     test_losses = []
+    #     with torch.no_grad():
+    #         for batch in test_loader:
+    #             x = batch[0].to(device)
+    #             lens = batch[1].squeeze().long()
+    #
+    #             x_rec, _ = model(x)
+    #             loss = criterion(x, x_rec)
+    #             test_losses.append(loss.item())
+    #     plot_stocks_with_rec(x[:3].detach().cpu(), x_rec[:3].detach().cpu(), lens[:3])
+    #     print('test loss: {:.2f}'.format(np.mean(test_losses)))
 
 
 
