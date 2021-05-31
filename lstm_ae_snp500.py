@@ -5,14 +5,13 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import TensorDataset
 from tqdm import trange
 
-
 from Model import LSTM_AutoEncoder
-from Utils import plot_signals_with_rec, plot_stocks_with_rec, plot_loss
+from Utils import plot_stocks_with_rec
 
 
 def set_all_seed(seed):
@@ -41,7 +40,7 @@ if __name__ == '__main__':
 
     # hyperparameters
     parser = argparse.ArgumentParser(description="S&P500 Task")
-    parser.add_argument("--epochs", type=int, default=10000)
+    parser.add_argument("--epochs", type=int, default=4000)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--optimizer", type=str, default="Adam")
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -62,7 +61,6 @@ if __name__ == '__main__':
 
     suff = 'lr={:.5f}_bs={}_hs={}_clip={:.2f}'.format(args.lr, args.batch_size, args.hidden_size,
                                                       args.clip)
-
     if do_create_data:
         train_kwargs = {'batch_size': args.batch_size}
         test_kwargs = {'batch_size': args.batch_size}
@@ -167,7 +165,7 @@ if __name__ == '__main__':
                                   .format(epoch, np.mean(losses)))
 
             train_loss.append(np.mean(losses))
-            if epoch % 100 == 0:
+            if epoch % 200 == 0:
                 plot_stocks_with_rec(x[:3].cpu(), x_rec[:3].cpu(), lens[:3], epoch=epoch)
                 if do_predict:
                     x_pred = x_pred.detach()
@@ -176,27 +174,23 @@ if __name__ == '__main__':
                                          label_2='Predicted Stock Value',
                                          epoch=epoch)
 
-        if do_test:
-            model.eval()
-            test_losses = []
-            with torch.no_grad():
-                for batch in test_loader:
-                    x = batch[0].to(device)
-                    lens = batch[1].squeeze().long()
+    if do_test:
+        model.eval()
+        test_losses = []
+        with torch.no_grad():
+            for batch in test_loader:
+                x = batch[0].to(device)
+                lens = batch[1].squeeze().long()
 
-                    x_rec, _ = model(x)
-                    loss = 0.0
-                    for i, idx in enumerate(lens):
-                        loss += criterion(x[i][:idx], x_rec[i][:idx])
-                    test_losses.append(loss.item())
+                x_rec, _ = model(x)
+                loss = 0.0
+                for i, idx in enumerate(lens):
+                    loss += criterion(x[i][:idx], x_rec[i][:idx])
+                test_losses.append(loss.item())
 
-                    test_loss.append(np.mean(test_losses))
-                    t.set_description('epoch {} train_loss {:.2f} test_loss {:.2f}'
-                                      .format(epoch, np.mean(losses), np.mean(test_losses)))
-
-                torch.save(model.state_dict(), 'sp500_data_model_weights_{}.pth'.format(suff))
-            plot_loss(train_loss, test_loss, args.epochs, suff, parser.description)
-
+                test_loss.append(np.mean(test_losses))
+                t.set_description('epoch {} train_loss {:.2f} test_loss {:.2f}'
+                                  .format(epoch, np.mean(losses), np.mean(test_losses)))
 
 
 
