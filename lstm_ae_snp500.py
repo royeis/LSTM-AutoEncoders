@@ -170,21 +170,6 @@ if __name__ == '__main__':
                     x_pred = x_pred.detach()
                     plot_stocks_with_rec(x[:3].cpu(), x_pred[:3].cpu(), lens[:3])
 
-
-            # model.eval()
-            # test_losses = []
-            # with torch.no_grad():
-            #     for batch in test_loader:
-            #         x = batch[0].to(device)
-            #         lens = batch[1].squeeze().long()
-            #
-            #         x_rec, _ = model(x)
-            #         loss = 0.0
-            #         for i, idx in enumerate(lens):
-            #             loss += criterion(x[i][:idx], x_rec[i][:idx])
-            #         test_losses.append(loss.item())
-            # scheduler.step(np.mean(test_losses))
-
         torch.save(model.state_dict(), 'sp_model_predictor_hs256.pth')
 
     if do_test:
