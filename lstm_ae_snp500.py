@@ -153,7 +153,6 @@ if __name__ == '__main__':
                         true_seq = x[i][1:idx]
                         loss += criterion(true_seq, pred_seq)
 
-
                 losses.append(loss.item())
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -166,46 +165,37 @@ if __name__ == '__main__':
 
                 t.set_description('epoch {} train_loss {:.2f} '
                                   .format(epoch, np.mean(losses)))
-            if epoch % 25 == 0:
-                plot_stocks_with_rec(x[:3].cpu(), x_rec[:3].cpu(), lens[:3])
+
+            train_loss.append(np.mean(losses))
+            if epoch % 100 == 0:
+                plot_stocks_with_rec(x[:3].cpu(), x_rec[:3].cpu(), lens[:3], epoch=epoch)
                 if do_predict:
                     x_pred = x_pred.detach()
-                    plot_stocks_with_rec(x[:3].cpu(), x_pred[:3].cpu(), lens[:3])
+                    plot_stocks_with_rec(x[:3].cpu(), x_pred[:3].cpu(), lens[:3],
+                                         fig_title='Signal Prediction',
+                                         label_2='Predicted Stock Value',
+                                         epoch=epoch)
 
-    if do_test:
-        model.eval()
-        test_losses = []
-        with torch.no_grad():
-            for batch in test_loader:
-                x = batch[0].to(device)
-                lens = batch[1].squeeze().long()
+        if do_test:
+            model.eval()
+            test_losses = []
+            with torch.no_grad():
+                for batch in test_loader:
+                    x = batch[0].to(device)
+                    lens = batch[1].squeeze().long()
 
-                x_rec, _ = model(x)
-                loss = 0.0
-                for i, idx in enumerate(lens):
-                    loss += criterion(x[i][:idx], x_rec[i][:idx])
-                test_losses.append(loss.item())
-                # scheduler.step(np.mean(test_losses))
-                test_loss.append(np.mean(test_losses))
-                t.set_description('epoch {} train_loss {:.2f} test_loss {:.2f}'
-                                  .format(epoch, np.mean(losses), np.mean(test_losses)))
+                    x_rec, _ = model(x)
+                    loss = 0.0
+                    for i, idx in enumerate(lens):
+                        loss += criterion(x[i][:idx], x_rec[i][:idx])
+                    test_losses.append(loss.item())
 
-            torch.save(model.state_dict(), 'sp500_data_model_weights_{}.pth'.format(suff))
-        plot_loss(train_loss, test_loss, args.epochs, suff, parser.description)
-    # if do_test:
-    #     model.load_state_dict(torch.load('sp_model_hs128.pth'))
-    #     model.eval()
-    #     test_losses = []
-    #     with torch.no_grad():
-    #         for batch in test_loader:
-    #             x = batch[0].to(device)
-    #             lens = batch[1].squeeze().long()
-    #
-    #             x_rec, _ = model(x)
-    #             loss = criterion(x, x_rec)
-    #             test_losses.append(loss.item())
-    #     plot_stocks_with_rec(x[:3].detach().cpu(), x_rec[:3].detach().cpu(), lens[:3])
-    #     print('test loss: {:.2f}'.format(np.mean(test_losses)))
+                    test_loss.append(np.mean(test_losses))
+                    t.set_description('epoch {} train_loss {:.2f} test_loss {:.2f}'
+                                      .format(epoch, np.mean(losses), np.mean(test_losses)))
+
+                torch.save(model.state_dict(), 'sp500_data_model_weights_{}.pth'.format(suff))
+            plot_loss(train_loss, test_loss, args.epochs, suff, parser.description)
 
 
 
