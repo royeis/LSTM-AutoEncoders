@@ -101,3 +101,47 @@ def plot_loss(train_loss, val_loss, test_loss, epochs, suff, data=""):
     plt.savefig('{}_loss_{}.png'.format(data, suff),
                 transparent=True, bbox_inches='tight', pad_inches=0, dpi=300)
     plt.show()
+
+
+def plot_err_epoch(train_loss, test_loss, train_acc, test_acc, epochs, suff, data=""):
+    fig, ax = plt.subplots()
+    ax.set_title(data +
+                 '\nLoss vs. Epoch' +
+                 f'\n{suff}')
+    ax.plot(range(epochs), train_loss, label='Train Loss')
+    ax.plot(range(epochs), test_loss, label='Test Loss')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.legend()
+    plt.savefig('{}_loss_{}.png'.format(data, suff),
+                transparent=True, bbox_inches='tight', pad_inches=0, dpi=300)
+    plt.show()
+
+    fig, ax = plt.subplots()
+    ax.set_title(data +
+                 '\nAccuracy vs. Epoch' +
+                 f'\n{suff}')
+    ax.plot(range(epochs), train_acc, label='Train Acc')
+    ax.plot(range(epochs), test_acc, label='Test Acc')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.legend()
+    plt.savefig('{}_acc_{}.png'.format(data, suff),
+                transparent=True, bbox_inches='tight', pad_inches=0, dpi=300)
+    plt.show()
+
+
+def plot_loss(train_loss, val_loss, test_loss, epochs, suff, data=""):
+    fig, ax = plt.subplots()
+    ax.set_title(data +
+                 '\nLoss vs. Epoch' +
+                 f'\n{suff}')
+    ax.plot(range(epochs), train_loss, label='Train Loss')
+    ax.plot(range(epochs), val_loss, label='Validation Loss')
+    ax.plot(range(epochs), test_loss, label='Test Loss')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.legend()
+    plt.savefig('{}_loss_{}.png'.format(data, suff),
+                transparent=True, bbox_inches='tight', pad_inches=0, dpi=300)
+    plt.show()
